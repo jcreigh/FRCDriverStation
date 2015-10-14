@@ -211,10 +211,11 @@ f.unknown1 = ProtoField.uint8("FRC_RoboRIO.unknown1", "Unknown field 1", base.HE
 f.control = ProtoField.uint8("FRC_RoboRIO.control", "Control Byte")
 f.mode = ProtoField.uint8("FRC_RoboRIO.mode", "Mode")
 f.enabled = ProtoField.bool("FRC_RoboRIO.enabled", "Enabled")
+f.connecting = ProtoField.bool("FRC_RoboRIO.connecting", "Connecting")
 f.estop = ProtoField.bool("FRC_RoboRIO.estop", "Emergency Stop")
-f.unknown2 = ProtoField.uint8("FRC_RoboRIO.unknown2", "Unknown field 2", base.HEX)
+f.codestatus = ProtoField.uint8("FRC_RoboRIO.codestatus", "Code Status", base.HEX)
 f.battery = ProtoField.string("FRC_RoboRIO.battery", "Battery")
-f.unknown3 = ProtoField.uint8("FRC_RoboRIO.unknown3", "Unknown field 3", base.HEX)
+f.unknown2 = ProtoField.uint8("FRC_RoboRIO.unknown2", "Unknown field 2", base.HEX)
 f.rest = ProtoField.bytes("FRC_RoboRIO.rest", "Rest")
 
 function FRC_RoboRIO.dissector(buf, pkt, tree)
@@ -229,14 +230,20 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 
 	local modeText = {"TeleOp", "Test", "Autonomous"}
 	local enabledText = {"Disabled", "Enabled"}
+	local connectingText = {"Idle", "Connecting"}
 	local estopText = {"Running", "Emergency Stopped"}
 
 	local mode = {}
 	mode.num = bit.band(modeRaw, 3)
 	mode.text = modeText[mode.num + 1]
+
 	local enabled = {}
 	enabled.num = bit.band(bit.rshift(modeRaw, 2), 1)
 	enabled.text = enabledText[enabled.num + 1]
+
+	local connecting = {}
+	connecting.num = bit.band(bit.rshift(modeRaw, 3), 1)
+	connecting.text = connectingText[connecting.num + 1]
 
 	local estop = {}
 	estop.num = bit.band(bit.rshift(modeRaw, 7), 1)
@@ -253,21 +260,31 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 
 	modetree:add(f.mode, modeBuf, mode.num):set_text("......" .. bit.band(bit.rshift(mode.num, 1), 1) .. bit.band(mode.num, 1) .. " (" .. mode.text .. ")")
 	modetree:add(f.enabled, modeBuf, enabled.num):set_text("....." .. enabled.num .. ".. (" .. enabled.text .. ")")
+	modetree:add(f.connecting, modeBuf, connecting.num):set_text("...." .. connecting.num .. "... (" .. connecting.text .. ")")
 	modetree:add(f.estop, modeBuf, estop.num):set_text("" .. estop.num .. "....... (" .. estop.text .. ")")
 
-	subtree:add(f.unknown2, buf(4,1))
+	local codestatusBuf = buf(4, 1)
+	local codeStatus = {buf = buf(4, 1)}
+	codeStatus.raw = codeStatus.buf:uint()
+	codeStatus.text = "Unknown"
+	if (codeStatus.raw == 0x10) then
+		codeStatus.text = "No Robot Code"
+	elseif (codeStatus.raw == 0x30) then
+		codeStatus.text = "Okay"
+	end
+	subtree:add(f.codestatus, buf(4,1), codeStatus.raw):append_text(" (" .. codeStatus.text .. ")")
 
-	local batteryLevel = buf(5,1):uint() .. "." .. math.floor(100 * buf(6,1):uint() / 255) -- Maybe
+	local batteryLevel = string.format("%.2d.%02d", buf(5,1):uint(), math.floor(99 * buf(6,1):uint() / 255)) -- Maybe
 	subtree:add(f.battery, buf(5, 2), batteryLevel)
 
-	subtree:add(f.unknown3, buf(7,1))
+	subtree:add(f.unknown2, buf(7,1))
 
 	local restData = buf(8)
 	if (restData:len() > 0) then
 		subtree:add(f.rest, restData)
 	end
 
-	pkt.cols.info:set("Mode: " .. mode.text)
+	pkt.cols.info:set("Mode: " .. modeExtraText .. "  Battery: " .. batteryLevel .. "  Status: " .. codeStatus.text)
 
 end
 
