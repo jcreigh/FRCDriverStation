@@ -16,6 +16,17 @@ f.unknown = ProtoField.uint8("FRC_DS.unknown", "Unknown field", base.HEX)
 f.action = ProtoField.uint8("FRC_DS.action", "Action", base.HEX)
 f.alliance_color = ProtoField.string("FRC_DS.alliance.color", "Alliance color")
 f.alliance_pos = ProtoField.uint8("FRC_DS.alliance.pos", "Alliance position")
+f.protocol = ProtoField.uint8("FRC_DS.protocol", "Protocol Version?")
+f.date_nsec = ProtoField.uint32("FRC_DS.date.nanosecond", "Nanoseconds?")
+f.date_sec = ProtoField.uint8("FRC_DS.date.second", "Second")
+f.date_min = ProtoField.uint8("FRC_DS.date.minute", "Minute")
+f.date_hour = ProtoField.uint8("FRC_DS.date.hour", "Hour")
+f.date_day = ProtoField.uint8("FRC_DS.date.day", "Day")
+f.date_month = ProtoField.uint8("FRC_DS.date.month", "Month")
+f.date_year = ProtoField.uint8("FRC_DS.date.year", "Year")
+f.date_tz_size = ProtoField.uint8("FRC_DS.date.tz_size", "Timezone Size")
+f.date_tz_raw = ProtoField.bytes("FRC_DS.date.tz_raw", "Raw Timezone")
+f.date_tz = ProtoField.string("FRC_DS.date.tz", "Timezone")
 f.rest = ProtoField.bytes("FRC_DS.rest", "Rest")
 
 f.js_count = ProtoField.uint8("FRC_DS.joystick_count", "Number of joysticks")
@@ -117,7 +128,7 @@ function FRC_DS.dissector(buf, pkt, tree)
 	modetree:add(f.enabled, modeBuf, enabled.num):set_text("....." .. enabled.num .. ".. (" .. enabled.text .. ")")
 	modetree:add(f.estop, modeBuf, estop.num):set_text("" .. estop.num .. "....... (" .. estop.text .. ")")
 
-	local actionText = {[0x00] = "Connect", [0x10] = "noop", [0x14] = "Restart Code", [0x18] = "Restart RoboRIO"}
+	local actionText = {[0x00] = "Connect", [0x04] = "Unknown", [0x10] = "noop", [0x14] = "Restart Code", [0x18] = "Restart RoboRIO"}
 	local action = buf(4,1):uint()
 	subtree:add(f.action, buf(4, 1)):append_text(" (" .. actionText[action] .. ")")
 
@@ -190,8 +201,23 @@ function FRC_DS.dissector(buf, pkt, tree)
 		offset = offset + 2 * #js.povs + 1
 
 	end
+
 	if (restData:len() > 0) then
-		subtree:add(f.rest, buf(offset))
+		subtree:add(f.protocol, buf(offset + 1, 1))
+		local datetree = subtree:add("Date Info:", buf(offset))
+		datetree:add(f.date_nsec, buf(offset + 2, 4))
+		offset = offset + 6
+		datetree:add(f.date_sec, buf(offset, 1))
+		datetree:add(f.date_min, buf(offset + 1, 1))
+		datetree:add(f.date_hour, buf(offset + 2, 1))
+		datetree:add(f.date_day, buf(offset + 3, 1))
+		datetree:add(f.date_month, buf(offset + 4, 1))
+		datetree:add(f.date_year, buf(offset + 5, 1))
+		offset = offset + 6
+		local tzSize = buf(offset, 1):uint()
+		datetree:add(f.date_tz_size, buf(offset, 1))
+		-- datetree:add(f.date_tz_raw, buf(offset + 1, tzSize))
+		datetree:add(f.date_tz, buf(offset + 2, tzSize - 1)) -- Skip the first byte which always seems to be 0x10
 	end
 
 	pkt.cols.info:set("Mode: " .. modeExtraText .. "  Alliance: " .. alliance.color .. " " .. alliance.pos .. "  Action: " .. actionText[action])
@@ -216,6 +242,14 @@ f.estop = ProtoField.bool("FRC_RoboRIO.estop", "Emergency Stop")
 f.codestatus = ProtoField.uint8("FRC_RoboRIO.codestatus", "Code Status", base.HEX)
 f.battery = ProtoField.string("FRC_RoboRIO.battery", "Battery")
 f.unknown2 = ProtoField.uint8("FRC_RoboRIO.unknown2", "Unknown field 2", base.HEX)
+
+f.can_unknown = ProtoField.bytes("FRC_RoboRIO.CAN.unknown", "Unknown")
+f.can_utilization = ProtoField.uint8("FRC_RoboRIO.CAN.utilization", "Utilization %")
+f.can_busoff = ProtoField.uint8("FRC_RoboRIO.CAN.bus_off", "Bus Off")
+f.can_txfull = ProtoField.uint8("FRC_RoboRIO.CAN.tx_full", "TX Full")
+f.can_receive = ProtoField.uint8("FRC_RoboRIO.CAN.receive", "Receive")
+f.can_transmit = ProtoField.uint8("FRC_RoboRIO.CAN.transmit", "Transmit")
+
 f.rest = ProtoField.bytes("FRC_RoboRIO.rest", "Rest")
 
 function FRC_RoboRIO.dissector(buf, pkt, tree)
@@ -280,8 +314,22 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	subtree:add(f.unknown2, buf(7,1))
 
 	local restData = buf(8)
-	if (restData:len() > 0) then
-		subtree:add(f.rest, restData)
+	while (restData:len() > 0) do
+		local size = restData(0, 1):uint()
+		local pktID = restData(1, 1):uint()
+		if (pktID == 0x0e) then -- CAN Metrics
+			local cantree = subtree:add("CAN Metrics", restData(0, size + 1))
+			cantree:add(f.can_unknown, restData(2, 9))
+			cantree:add(f.can_utilization, restData(11, 1))
+			cantree:add(f.can_busoff, restData(12, 1))
+			cantree:add(f.can_txfull, restData(13, 1))
+			cantree:add(f.can_receive, restData(14, 1))
+			cantree:add(f.can_transmit, restData(15, 1))
+			break
+		else
+			subtree:add(f.rest, restData)
+			break
+		end
 	end
 
 	pkt.cols.info:set("Mode: " .. modeExtraText .. "  Battery: " .. batteryLevel .. "  Status: " .. codeStatus.text)
