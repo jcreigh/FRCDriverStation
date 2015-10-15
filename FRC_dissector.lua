@@ -238,10 +238,40 @@ f.control = ProtoField.uint8("FRC_RoboRIO.control", "Control Byte")
 f.mode = ProtoField.uint8("FRC_RoboRIO.mode", "Mode")
 f.enabled = ProtoField.bool("FRC_RoboRIO.enabled", "Enabled")
 f.connecting = ProtoField.bool("FRC_RoboRIO.connecting", "Connecting")
+f.brownout = ProtoField.bool("FRC_RoboRIO.brownout", "Voltage Brownout")
 f.estop = ProtoField.bool("FRC_RoboRIO.estop", "Emergency Stop")
 f.codestatus = ProtoField.uint8("FRC_RoboRIO.codestatus", "Code Status", base.HEX)
 f.battery = ProtoField.string("FRC_RoboRIO.battery", "Battery")
 f.unknown2 = ProtoField.uint8("FRC_RoboRIO.unknown2", "Unknown field 2", base.HEX)
+
+for js_i = 0, 5 do
+	local fieldName = "FRC_RoboRIO.joystick." .. js_i
+	f["js_" .. js_i] =  ProtoField.bytes(fieldName, "Joystick #" .. js_i)
+
+	f["js_" .. js_i .. "_out"] =  ProtoField.bytes(fieldName , "Outputs")
+	for i = 1, 32 do
+		f["js_" .. js_i .. "_out_" .. i] =  ProtoField.bool(fieldName .. ".out." .. i, "Output #" .. i)
+	end
+
+	f["js_" .. js_i .. "_rumble_left"] =  ProtoField.uint16(fieldName .. ".rumble.left", "Rumble Left")
+	f["js_" .. js_i .. "_rumble_right"] =  ProtoField.uint16(fieldName .. ".rumble.right", "Rumble Right")
+
+end
+
+f.pkt04 = ProtoField.bytes("FRC_RoboRIO.pkt04", "Unknown Pkt 1")
+f.pkt04_unknown = ProtoField.bytes("FRC_RoboRIO.pkt04.unknown", "Unknown")
+
+f.cpu = ProtoField.bytes("FRC_RoboRIO.CPU", "CPU Info")
+f.cpu_count = ProtoField.uint8("FRC_RoboRIO.CPU.count", "Number of Cores")
+f.cpu_0 = ProtoField.float("FRC_RoboRIO.CPU.0", "CPU0 %")
+f.cpu_unknown1 = ProtoField.bytes("FRC_RoboRIO.cpu.unknown1", "Unknown 1")
+f.cpu_unknown2 = ProtoField.float("FRC_RoboRIO.cpu.unknown2", "Unknown 2")
+f.cpu_1 = ProtoField.float("FRC_RoboRIO.CPU.1", "CPU1 %")
+f.cpu_unknown3 = ProtoField.bytes("FRC_RoboRIO.cpu.unknown3", "Unknown 3")
+f.cpu_unknown4 = ProtoField.float("FRC_RoboRIO.cpu.unknown4", "Unknown 4")
+
+f.pkt06 = ProtoField.bytes("FRC_RoboRIO.pkt06", "Unknown Pkt 2")
+f.pkt06_unknown = ProtoField.bytes("FRC_RoboRIO.pkt06.unknown", "Unknown")
 
 f.can_unknown = ProtoField.bytes("FRC_RoboRIO.CAN.unknown", "Unknown")
 f.can_utilization = ProtoField.uint8("FRC_RoboRIO.CAN.utilization", "Utilization %")
@@ -257,7 +287,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local subtree = tree:add(FRC_RoboRIO, buf())
 
 	subtree:add(f.seqNum, buf(0,2))
-	subtree:add(f.unknown1, buf(2,1))
+	-- subtree:add(f.unknown1, buf(2,1))
 
 	local modeBuf = buf(3, 1)
 	local modeRaw = buf(3, 1):uint()
@@ -265,6 +295,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local modeText = {"TeleOp", "Test", "Autonomous"}
 	local enabledText = {"Disabled", "Enabled"}
 	local connectingText = {"Idle", "Connecting"}
+	local brownoutText = {"Voltage: Normal", "Voltage: Brownout"}
 	local estopText = {"Running", "Emergency Stopped"}
 
 	local mode = {}
@@ -278,6 +309,10 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local connecting = {}
 	connecting.num = bit.band(bit.rshift(modeRaw, 3), 1)
 	connecting.text = connectingText[connecting.num + 1]
+
+	local brownout = {}
+	brownout.num = bit.band(bit.rshift(modeRaw, 4), 1)
+	brownout.text = brownoutText[brownout.num + 1]
 
 	local estop = {}
 	estop.num = bit.band(bit.rshift(modeRaw, 7), 1)
@@ -295,6 +330,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	modetree:add(f.mode, modeBuf, mode.num):set_text("......" .. bit.band(bit.rshift(mode.num, 1), 1) .. bit.band(mode.num, 1) .. " (" .. mode.text .. ")")
 	modetree:add(f.enabled, modeBuf, enabled.num):set_text("....." .. enabled.num .. ".. (" .. enabled.text .. ")")
 	modetree:add(f.connecting, modeBuf, connecting.num):set_text("...." .. connecting.num .. "... (" .. connecting.text .. ")")
+	modetree:add(f.brownout, modeBuf, brownout.num):set_text("..." .. brownout.num .. ".... (" .. brownout.text .. ")")
 	modetree:add(f.estop, modeBuf, estop.num):set_text("" .. estop.num .. "....... (" .. estop.text .. ")")
 
 	local codestatusBuf = buf(4, 1)
@@ -311,13 +347,41 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local batteryLevel = string.format("%.2d.%02d", buf(5,1):uint(), math.floor(99 * buf(6,1):uint() / 255)) -- Maybe
 	subtree:add(f.battery, buf(5, 2), batteryLevel)
 
-	subtree:add(f.unknown2, buf(7,1))
+	-- subtree:add(f.unknown2, buf(7,1))
 
 	local restData = buf(8)
+	local js_i = 0
 	while (restData:len() > 0) do
 		local size = restData(0, 1):uint()
 		local pktID = restData(1, 1):uint()
-		if (pktID == 0x0e) then -- CAN Metrics
+		if (pktID == 0x01) then -- Joystick Output
+			local jstree = subtree:add(f["js_" .. js_i], restData(0, size + 1))
+			if (size > 2) then
+				local outtree = jstree:add(f["js_" .. js_i .. "_out"], restData(2, 4))
+				for i = 0, 31 do
+					local val = restData(5 - math.floor(i / 8), 1)
+					outtree:add(f["js_" .. js_i .. "_out_" .. (i + 1)], val, bit.band(bit.rshift(val:uint(), i % 8), 1))
+				end
+				jstree:add(f["js_" .. js_i .. "_rumble_left"], restData(6, 2))
+				jstree:add(f["js_" .. js_i .. "_rumble_right"], restData(8, 2))
+			end
+			js_i = js_i + 1
+		elseif (pktID == 0x04) then -- Unknown 1
+			local pkttree = subtree:add(f.pkt04, restData(0, size + 1))
+			pkttree:add(f.pkt04_unknown, restData(2, size - 1))
+		elseif (pktID == 0x05) then -- CPU Info
+			local cputree = subtree:add(f.cpu, restData(0, size + 1))
+			cputree:add(f.cpu_count, restData(2, 1))
+			cputree:add(f.cpu_0, restData(3, 4))
+			cputree:add(f.cpu_unknown1, restData(7, 8))
+			cputree:add(f.cpu_unknown2, restData(15, 4))
+			cputree:add(f.cpu_1, restData(19, 4))
+			cputree:add(f.cpu_unknown3, restData(23, 8))
+			cputree:add(f.cpu_unknown4, restData(31, 4))
+		elseif (pktID == 0x06) then -- Unknown 2
+			local pkttree = subtree:add(f.pkt06, restData(0, size + 1))
+			pkttree:add(f.pkt06_unknown, restData(2, size - 1))
+		elseif (pktID == 0x0e) then -- CAN Metrics
 			local cantree = subtree:add("CAN Metrics", restData(0, size + 1))
 			cantree:add(f.can_unknown, restData(2, 9))
 			cantree:add(f.can_utilization, restData(11, 1))
@@ -325,12 +389,21 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 			cantree:add(f.can_txfull, restData(13, 1))
 			cantree:add(f.can_receive, restData(14, 1))
 			cantree:add(f.can_transmit, restData(15, 1))
-			break
 		else
-			subtree:add(f.rest, restData)
+			break
+		end
+		if (restData:len() > size + 1) then
+			restData = restData(size + 1)
+		else
+			restData = ""
 			break
 		end
 	end
+
+	if (restData:len() > 0) then
+		subtree:add(f.rest, restData)
+	end
+
 
 	pkt.cols.info:set("Mode: " .. modeExtraText .. "  Battery: " .. batteryLevel .. "  Status: " .. codeStatus.text)
 
