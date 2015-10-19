@@ -15,7 +15,7 @@ f.control = ProtoField.uint8("FRC_DS.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_DS.control.mode", "Mode")
 f.enabled = ProtoField.bool("FRC_DS.control.enabled", "Enabled")
 f.estop = ProtoField.bool("FRC_DS.control.estop", "Emergency Stop")
-f.DSConnected = ProtoField.bool("FRC_DS.control.DSConnected", "Driver Station Connected")
+f.FMSConnected = ProtoField.bool("FRC_DS.control.FMSConnected", "FMS Connected")
 f.restartRobotCode = ProtoField.bool("FRC_DS.control.restartRobotCode", "Restart Robot Code")
 f.rebootRoboRIO = ProtoField.bool("FRC_DS.control.rebootRoboRIO", "Reboot RoboRIO")
 f.ctrlUnknown = ProtoField.uint16("FRC_DS.control.unknown", "Unknown")
@@ -78,7 +78,7 @@ function FRC_DS.dissector(buf, pkt, tree)
 	local controlTree = subtree:add(f.control, control.buf )
 	controlTree:append_text(" (" .. controlText .. ")")
 
-	local items = {"raw", "mode", "enabled", "estop", "restartRobotCode", "rebootRoboRIO", "unknown"}
+	local items = {"raw", "mode", "enabled", "estop", "FMSConnected", "restartRobotCode", "rebootRoboRIO", "unknown"}
 	for i, v in ipairs(items) do
 		controlTree:add(f[v], control[v].buf, control[v].val):set_text(control[v].bitstr .. " (" .. control[v].name .. ": " .. control[v].text .. ")")
 	end

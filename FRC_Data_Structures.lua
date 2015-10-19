@@ -24,17 +24,17 @@ function parser.parseControlBytes(buf)
 	out.buf = buf
 
 	local fields = {}
-	fields.estop = {bitnum=0, name="E-Stopped", text={"No", "Yes"}}                 -- 1000 0000  0000 0000
-	fields.brownout = {bitnum=3, name="Voltage", text={"Normal", "Brownout"}}       -- 0001 0000  0000 0000
-	fields.codeState = {bitnum=4, name="Code", text={"Idle", "Initializing"}}       -- 0000 1000  0000 0000
-	fields.enabled = {bitnum=5, name="State", text={"Disabled", "Enabled"}}         -- 0000 0100  0000 0000
-	fields.mode = {bitnum=6, size=2, name="Mode"}                                   -- 0000 0011  0000 0000
+	fields.estop = {bitnum=0, name="E-Stopped", text={"No", "Yes"}}                  -- 1000 0000  0000 0000
+	fields.brownout = {bitnum=3, name="Voltage", text={"Normal", "Brownout"}}        -- 0001 0000  0000 0000
+	fields.codeState = {bitnum=4, name="Code", text={"Idle", "Initializing"}}        -- 0000 1000  0000 0000
+	fields.FMSConnected = {bitnum=4, name="FMS", text={"Disconnected", "Connected"}} -- 0000 0000  0001 0000
+	fields.enabled = {bitnum=5, name="State", text={"Disabled", "Enabled"}}          -- 0000 0100  0000 0000
+	fields.mode = {bitnum=6, size=2, name="Mode"}                                    -- 0000 0011  0000 0000
 	fields.mode.text = {"TeleOp", "Test", "Autonomous", "Unknown"}
-	fields.robotCode = {bitnum=10, name="Robot Code", text={"No", "Yes"}}           -- 0000 0000  0010 0000
-	fields.DSConnected = {bitnum=11, name="DS", text={"Disconnected", "Connected"}} -- 0000 0000  0001 0000
-	fields.rebootRoboRIO = {bitnum=12, name="Reboot", text={"No", "Yes"}}           -- 0000 0000  0000 1000
-	fields.restartRobotCode = {bitnum=13, name="Restart Code", text={"No", "Yes"}}  -- 0000 0000  0000 0100
-	fields.unknown = {mask=0x60c3, name="Unknown"}                                  -- 0110 0000  1100 0011
+	fields.robotCode = {bitnum=10, name="Robot Code", text={"No", "Yes"}}            -- 0000 0000  0010 0000
+	fields.rebootRoboRIO = {bitnum=12, name="Reboot", text={"No", "Yes"}}            -- 0000 0000  0000 1000
+	fields.restartRobotCode = {bitnum=13, name="Restart Code", text={"No", "Yes"}}   -- 0000 0000  0000 0100
+	fields.unknown = {mask=0x60c3, name="Unknown"}                                   -- 0110 0000  1100 0011
 
 	out.raw = {buf=out.buf, name="Raw", val=buf:uint(), bitstr=""}
 	out.raw.text = string.format("0x%02x", out.raw.val)

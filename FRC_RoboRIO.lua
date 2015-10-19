@@ -93,7 +93,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local controlTree = subtree:add(f.control, control.buf )
 	controlTree:append_text(" (" .. controlText .. ")")
 
-	local items = {"raw", "mode", "enabled", "codeState", "brownout", "estop", "DSConnected", "robotCode", "unknown"}
+	local items = {"raw", "mode", "enabled", "codeState", "brownout", "estop", "robotCode", "unknown"}
 	for i, v in ipairs(items) do
 		controlTree:add(f[v], control[v].buf, control[v].val):set_text(control[v].bitstr .. " (" .. control[v].name .. ": " .. control[v].text .. ")")
 	end

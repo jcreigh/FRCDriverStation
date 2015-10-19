@@ -7,3 +7,4 @@
 require("FRC_RoboRIO")
 require("FRC_DS")
 require("FRC_NetConsole")
+require("FRC_SideChannel")
