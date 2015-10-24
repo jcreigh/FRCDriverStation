@@ -12,7 +12,7 @@ local f = FRC_RoboRIO.fields
 f.seqNum = ProtoField.uint16("FRC_RoboRIO.seq", "Sequence Number", base.DEC)
 f.unknown1 = ProtoField.uint8("FRC_RoboRIO.unknown1", "Unknown field 1", base.HEX)
 
-f.control = ProtoField.uint8("FRC_RoboRIO.control", "Control Byte", base.HEX)
+f.control = ProtoField.uint16("FRC_RoboRIO.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_RoboRIO.control.mode", "Mode")
 f.enabled = ProtoField.bool("FRC_RoboRIO.control.enabled", "Enabled")
 f.codeState = ProtoField.bool("FRC_RoboRIO.control.codeState", "Code State")
@@ -98,10 +98,9 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 		controlTree:add(f[v], control[v].buf, control[v].val):set_text(control[v].bitstr .. " (" .. control[v].name .. ": " .. control[v].text .. ")")
 	end
 
-	local batteryLevel = string.format("%.2d.%02d", buf(5,1):uint(), math.floor(99 * buf(6, 1):uint() / 255)) -- Maybe
-	subtree:add(f.battery, buf(5, 2), batteryLevel)
-
-	info["Battery"] = batteryLevel
+	local batteryLevel = parser.parseBattery(buf(5, 2))
+	subtree:add(f.battery, batteryLevel.buf, batteryLevel.val)
+	info["Battery"] = batteryLevel.val
 
 	-- subtree:add(f.unknown2, buf(7,1))
 
@@ -171,7 +170,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 		initial = false
 	end
 
-	pkt.cols.info:set(infoStr)
+	pkt.cols.info:set("RoboRIO->DS   " ..  infoStr)
 
 end
 

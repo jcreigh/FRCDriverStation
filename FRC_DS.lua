@@ -149,7 +149,7 @@ function FRC_DS.dissector(buf, pkt, tree)
 		initial = false
 	end
 
-	pkt.cols.info:set(infoStr)
+	pkt.cols.info:set("DS->RoboRIO   " .. infoStr)
 
 end
 

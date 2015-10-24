@@ -40,8 +40,7 @@ local function dissect(buf, pkt, tree)
 		return 0, -1
 	end
 
-	local pktBuf = buf(bytes_consumed)
-	local sizeBuf = pktBuf(0, 2)
+	local sizeBuf = buf(0, 2)
 	local size = sizeBuf:uint()
 
 	if (size > max_msg_len) then

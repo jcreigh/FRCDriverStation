@@ -1,3 +1,9 @@
+--------------------------------------------------------------------------------
+-- Copyright (c) Creighton 2015. All Rights Reserved.                         --
+-- Open Source Software - May be modified and shared but must                 --
+-- be accompanied by the license file in the root source directory            --
+--------------------------------------------------------------------------------
+
 local parser = {}
 
 function parser.parseAllianceByte(buf)
@@ -19,26 +25,39 @@ function parser.parseAllianceByte(buf)
 	return out
 end
 
+function parser.parseBattery(buf)
+	local out = {}
+	out.buf = buf
+	out.val = string.format("%.2d.%02d", buf(0,1):uint(), math.floor(99 * buf(1, 1):uint() / 255)) -- Maybe
+	return out
+end
+
 function parser.parseControlBytes(buf)
 	local out = {}
 	out.buf = buf
 
+	local bitLimit = 15
+	if (buf:len() == 1) then
+		bitLimit = bitLimit - 8
+	end
+
 	local fields = {}
 	fields.estop = {bitnum=0, name="E-Stopped", text={"No", "Yes"}}                  -- 1000 0000  0000 0000
+	fields.DSConnected = {bitnum=2, name="DS", text={"Disconnected", "Connected"}}   -- 0010 0000  0000 0000
 	fields.brownout = {bitnum=3, name="Voltage", text={"Normal", "Brownout"}}        -- 0001 0000  0000 0000
 	fields.codeState = {bitnum=4, name="Code", text={"Idle", "Initializing"}}        -- 0000 1000  0000 0000
-	fields.FMSConnected = {bitnum=4, name="FMS", text={"Disconnected", "Connected"}} -- 0000 0000  0001 0000
+	fields.FMSConnected = {bitnum=4, name="FMS", text={"Disconnected", "Connected"}} -- 0000 1000  0000 0000
 	fields.enabled = {bitnum=5, name="State", text={"Disabled", "Enabled"}}          -- 0000 0100  0000 0000
 	fields.mode = {bitnum=6, size=2, name="Mode"}                                    -- 0000 0011  0000 0000
 	fields.mode.text = {"TeleOp", "Test", "Autonomous", "Unknown"}
 	fields.robotCode = {bitnum=10, name="Robot Code", text={"No", "Yes"}}            -- 0000 0000  0010 0000
 	fields.rebootRoboRIO = {bitnum=12, name="Reboot", text={"No", "Yes"}}            -- 0000 0000  0000 1000
 	fields.restartRobotCode = {bitnum=13, name="Restart Code", text={"No", "Yes"}}   -- 0000 0000  0000 0100
-	fields.unknown = {mask=0x60c3, name="Unknown"}                                   -- 0110 0000  1100 0011
+	fields.unknown = {mask=0x40c3, name="Unknown"}                                   -- 0110 0000  1100 0011
 
 	out.raw = {buf=out.buf, name="Raw", val=buf:uint(), bitstr=""}
 	out.raw.text = string.format("0x%02x", out.raw.val)
-	for i = 0, 15 do
+	for i = 0, bitLimit do
 		if (i > 0 and i % 8 == 0) then
 			out.raw.bitstr = out.raw.bitstr .. " "
 		end
@@ -53,24 +72,29 @@ function parser.parseControlBytes(buf)
 		local tmp = {name=v.name}
 
 		if (k ~= "unknown") then
-			tmp.val = out.buf:bitfield(v.bitnum, size)
-			tmp.buf = buf(math.floor(v.bitnum / 8), 1)
+			if (v.bitnum <= bitLimit) then
+				tmp.val = out.buf:bitfield(v.bitnum, size)
+				tmp.buf = buf(math.floor(v.bitnum / 8), 1)
 
-			local str = string.rep(".", v.bitnum)
-			for i = 1, size do
-				str = str .. bit.band(bit.rshift(tmp.val, size - i), 1)
+				local str = string.rep(".", v.bitnum)
+				for i = 1, size do
+					str = str .. bit.band(bit.rshift(tmp.val, size - i), 1)
+				end
+				str = str .. string.rep(".", (bitLimit + 1) - (v.bitnum + size))
+				if (bitLimit > 7) then
+					str = str:sub(1, 8) .. " " .. str:sub(9, 16)
+				end
+				tmp.text = v.text[tmp.val + 1]
+				tmp.bitstr = str
+				out[k] = tmp
 			end
-			str = str .. string.rep(".", 16 - (v.bitnum + size))
-			str = str:sub(1, 8) .. " " .. str:sub(9, 16)
-			tmp.text = v.text[tmp.val + 1]
-			tmp.bitstr = str
-			out[k] = tmp
 		else
-			tmp.val = bit.band(out.buf:uint(), v.mask)
+			local mask = bit.rshift(v.mask, 15 - bitLimit)
+			tmp.val = bit.band(out.buf:uint(), mask)
 			local str = ""
-			for i = 0, 15 do
-				local bitval = bit.band(bit.rshift(tmp.val, 15 - i), 1)
-				local maskbit = bit.band(bit.rshift(v.mask, 15 - i), 1)
+			for i = 0, bitLimit do
+				local bitval = bit.band(bit.rshift(tmp.val, bitLimit - i), 1)
+				local maskbit = bit.band(bit.rshift(mask, bitLimit - i), 1)
 				if (bitval == 1) then
 					str = str .. "1"
 				elseif (maskbit == 1) then
@@ -79,7 +103,9 @@ function parser.parseControlBytes(buf)
 					str = str .. "."
 				end
 			end
-			str = str:sub(1, 8) .. " " .. str:sub(9, 16)
+			if (bitLimit > 7) then
+				str = str:sub(1, 8) .. " " .. str:sub(9, 16)
+			end
 			tmp.bitstr = str
 			tmp.text = string.format("0x%x", tmp.val)
 			out[k] = tmp
@@ -189,14 +215,10 @@ function parser.parseStructure(buf)
 		out.receive = buf(14, 1)
 		out.transmit = buf(15, 1)
 	elseif (ID == 0x0f) then -- Date
-		out.text = "Date"
-		out.usec = buf(2, 4)
-		out.sec = buf(6, 1)
-		out.min =  buf(7, 1)
-		out.hour = buf(8, 1)
-		out.day = buf(9, 1)
-		out.month = buf(10, 1)
-		out.year = buf(11, 1)
+		local date = parseDate(buf(2))
+		for k, v in date do
+			out[k] = v
+		end
 	elseif (ID == 0x10) then -- Timezone
 		out.text = "Timezone"
 		out.tz = buf(2, size - 1)
@@ -210,6 +232,21 @@ function parser.parseStructure(buf)
 		out.rest = ""
 	end
 
+	return out
+end
+
+function parser.parseDate(buf)
+	local out = {}
+	out.text = "Date"
+	out.usec = buf(0, 4)
+	out.sec = buf(4, 1)
+	out.min =  buf(5, 1)
+	out.hour = buf(6, 1)
+	out.day = buf(7, 1)
+	out.month = buf(8, 1)
+	out.year = buf(9, 1)
+	out.dateText = string.format("%04d-%02d-%02d", out.year:uint() + 1900, out.month:uint() + 1, out.day:uint())
+	out.dateText = out.dateText .. " " .. string.format("%02d:%02d:%02d.%03d", out.hour:uint(), out.min:uint(), out.sec:uint(), out.usec:uint() / 1000 )
 	return out
 end
 
