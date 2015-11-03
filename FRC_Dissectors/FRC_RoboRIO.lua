@@ -116,8 +116,8 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 				for i = 1, 32 do
 					outputsTree:add(f["js_" .. js_i .. "_out_" .. i], struct.outputs[i].buf, struct.outputs[i].val)
 				end
-				jstree:add(f["js_" .. js_i .. "_rumble_left"], struct.rumble_left.buf, struct.rumble_left.val)
-				jstree:add(f["js_" .. js_i .. "_rumble_right"], struct.rumble_right.buf, struct.rumble_right.val)
+				jstree:add(f["js_" .. js_i .. "_rumble_left"], struct.rumble_left) -- .buf, struct.rumble_left.val)
+				jstree:add(f["js_" .. js_i .. "_rumble_right"], struct.rumble_right) -- .buf, struct.rumble_right.val)
 			end
 			js_i = js_i + 1
 		elseif (struct.ID == 0x04) then -- RAM Info

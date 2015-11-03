@@ -132,11 +132,11 @@ function parser.parseStructure(buf)
 			for i = 0, 31 do
 				local tmp = {}
 				tmp.buf = buf(5 - math.floor(i / 8), 1)
-				tmp.val = bit.band(bit.rshift(val:uint(), i % 8), 1)
+				tmp.val = bit.band(bit.rshift(tmp.buf:uint(), i % 8), 1)
 				table.insert(out.outputs, tmp)
 			end
-			out.rumble_left = {buf=buf(6, 2), val=buf(6, 2)}
-			out.rumble_right = {buf=buf(8, 2), val=buf(8, 2)}
+			out.rumble_left = buf(6, 2) -- {buf=buf(6, 2), val=buf(6, 2)}
+			out.rumble_right = buf(8, 2) -- {buf=buf(8, 2), val=buf(8, 2)}
 		end
 	elseif (ID == 0x04) then -- Disk Info
 		out.text = "Disk Info"
@@ -215,8 +215,8 @@ function parser.parseStructure(buf)
 		out.receive = buf(14, 1)
 		out.transmit = buf(15, 1)
 	elseif (ID == 0x0f) then -- Date
-		local date = parseDate(buf(2))
-		for k, v in date do
+		local date = parser.parseDate(buf(2))
+		for k, v in pairs(date) do
 			out[k] = v
 		end
 	elseif (ID == 0x10) then -- Timezone
