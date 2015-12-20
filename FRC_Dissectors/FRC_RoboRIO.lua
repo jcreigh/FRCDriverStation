@@ -64,10 +64,10 @@ f.can_receive = ProtoField.uint8("FRC_RoboRIO.CAN.receive", "Receive")
 f.can_transmit = ProtoField.uint8("FRC_RoboRIO.CAN.transmit", "Transmit")
 
 f.disk = ProtoField.bytes("FRC_RoboRIO.Disk", "Disk Info")
-f.disk_free = ProtoField.uint32("FRC_RoboRIO.Disk.space", "Space Available (KiB)")
+f.disk_free = ProtoField.uint32("FRC_RoboRIO.Disk.space", "Space Available (B)")
 
 f.ram = ProtoField.bytes("FRC_RoboRIO.RAM", "RAM Info")
-f.ram_free = ProtoField.uint32("FRC_RoboRIO.RAM.space", "Available (KiB)")
+f.ram_free = ProtoField.uint32("FRC_RoboRIO.RAM.space", "Available (B)")
 
 f.rest = ProtoField.bytes("FRC_RoboRIO.rest", "Rest")
 
@@ -122,7 +122,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 			js_i = js_i + 1
 		elseif (struct.ID == 0x04) then -- RAM Info
 			local diskInfoTree = subtree:add(f.disk, struct.buf)
-			diskInfoTree:set_text("Disk Info (" .. struct.disk.val .. " KiB)")
+			diskInfoTree:set_text("Disk Info (" .. struct.disk.val .. " B)")
 			diskInfoTree:add(f.disk_free, struct.disk.buf, struct.disk.val)
 		elseif (struct.ID == 0x05) then -- CPU Info
 			local cpuInfoTree = subtree:add(f.cpu, struct.buf)
@@ -138,7 +138,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 			end
 		elseif (struct.ID == 0x06) then -- Disk Info
 			local ramInfoTree = subtree:add(f.ram, struct.buf)
-			ramInfoTree:set_text("RAM Info (" .. struct.ram.val .. " KiB)")
+			ramInfoTree:set_text("RAM Info (" .. struct.ram.val .. " B)")
 			ramInfoTree:add(f.ram_free, struct.ram.buf, struct.ram.val)
 		elseif (struct.ID == 0x0e) then -- CAN Metrics
 			local canTree = subtree:add(f.can, struct.buf)

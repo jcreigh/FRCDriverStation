@@ -141,8 +141,8 @@ function parser.parseStructure(buf)
 	elseif (ID == 0x04) then -- Disk Info
 		out.text = "Disk Info"
 		local tmp = {}
-		tmp.buf = buf(5, 4)
-		tmp.val = tmp.buf:uint() / 4;
+		tmp.buf = buf(6, 4)
+		tmp.val = tmp.buf:uint();
 		out.disk = tmp;
 	elseif (ID == 0x05) then -- CPU Info
 		out.text = "CPU Info"
@@ -159,8 +159,8 @@ function parser.parseStructure(buf)
 	elseif (ID == 0x06) then -- RAM Info
 		out.text = "RAM Info"
 		local tmp = {}
-		tmp.buf = buf(5, 4)
-		tmp.val = tmp.buf:uint() / 4;
+		tmp.buf = buf(6, 4)
+		tmp.val = tmp.buf:uint();
 		out.ram = tmp;
 	elseif (ID == 0x0c) then -- Joystick
 		out.text = "Joystick"
