@@ -10,7 +10,7 @@ local FRC_RoboRIO = Proto("FRC_RoboRIO", "FRC RoboRIO")
 
 local f = FRC_RoboRIO.fields
 f.seqNum = ProtoField.uint16("FRC_RoboRIO.seq", "Sequence Number", base.DEC)
-f.unknown1 = ProtoField.uint8("FRC_RoboRIO.unknown1", "Unknown field 1", base.HEX)
+f.commVersion = ProtoField.uint8("FRC_DS.commVersion", "Comm Version")
 
 f.control = ProtoField.uint16("FRC_RoboRIO.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_RoboRIO.control.mode", "Mode")
@@ -23,7 +23,7 @@ f.robotCode = ProtoField.bool("FRC_RoboRIO.control.robotCode", "Robot Code")
 f.ctrlUnknown = ProtoField.uint16("FRC_RoboRIO.control.unknown", "Unknown")
 
 f.battery = ProtoField.string("FRC_RoboRIO.battery", "Battery")
-f.unknown2 = ProtoField.uint8("FRC_RoboRIO.unknown2", "Unknown field 2", base.HEX)
+f.requestDate = ProtoField.bool("FRC_RoboRIO.requestdate", "Request Date")
 
 for js_i = 0, 5 do
 	local fieldName = "FRC_RoboRIO.joystick." .. js_i
@@ -77,7 +77,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	local info = {}
 
 	subtree:add(f.seqNum, buf(0,2))
-	-- subtree:add(f.unknown1, buf(2,1))
+	subtree:add(f.commVersion, buf(2,1))
 
 	local control = parser.parseControlBytes(buf(3, 2))
 
@@ -102,7 +102,7 @@ function FRC_RoboRIO.dissector(buf, pkt, tree)
 	subtree:add(f.battery, batteryLevel.buf, batteryLevel.val)
 	info["Battery"] = batteryLevel.val
 
-	-- subtree:add(f.unknown2, buf(7,1))
+	 subtree:add(f.requestDate, buf(7,1))
 
 	local restData = buf(8)
 

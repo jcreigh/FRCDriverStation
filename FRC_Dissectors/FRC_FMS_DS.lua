@@ -10,7 +10,7 @@ local FRC_FMS_DS = Proto("FRC_FMS_DS", "FRC Field Management System")
 
 local f = FRC_FMS_DS.fields
 f.seqNum = ProtoField.uint16("FRC_FMS_DS.seq", "Sequence Number", base.DEC)
-f.unknown1 = ProtoField.uint8("FRC_FMS_DS.unknown1", "Unknown field 1", base.HEX)
+f.commVersion = ProtoField.uint8("FRC_DS.commVersion", "Comm Version")
 
 f.control = ProtoField.uint8("FRC_FMS_DS.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_FMS_DS.control.mode", "Mode")
@@ -18,10 +18,11 @@ f.enabled = ProtoField.bool("FRC_FMS_DS.control.enabled", "Enabled")
 f.estop = ProtoField.bool("FRC_FMS_DS.control.estop", "Emergency Stop")
 f.ctrlUnknown = ProtoField.uint16("FRC_FMS_DS.control.unknown", "Unknown")
 
-f.unknown2 = ProtoField.bytes("FRC_FMS_DS.unknown2", "Unknown field 2")
 f.alliance_color = ProtoField.string("FRC_FMS_DS.alliance.color", "Alliance color")
 f.alliance_pos = ProtoField.uint8("FRC_FMS_DS.alliance.pos", "Alliance position")
-f.unknown3 = ProtoField.bytes("FRC_FMS_DS.unknown3", "Unknown field 3")
+f.tournamentLvl = ProtoField.uint8("FRC_FMS_DS.tournamentLevel", "Tournament Level")
+f.matchNum = ProtoField.uint16("FRC_FMS_DS.matchNum", "Match Number")
+f.playNum = ProtoField.uint8("FRC_FMS_DS.playNum", "Play Number")
 
 f.date = ProtoField.bytes("FRC_FMS_DS.date", "Date")
 f.date_usec = ProtoField.uint32("FRC_FMS_DS.date.microseconds", "Microseconds")
@@ -41,7 +42,7 @@ function FRC_FMS_DS.dissector(buf, pkt, tree)
 	local info = {}
 
 	subtree:add(f.seqNum, buf(0,2))
-	subtree:add(f.unknown1, buf(2,1))
+	subtree:add(f.commVersion, buf(2,1))
 
 	local control = parser.parseControlBytes(buf(3, 1))
 
@@ -62,14 +63,16 @@ function FRC_FMS_DS.dissector(buf, pkt, tree)
 		controlTree:add(f[v], control[v].buf, control[v].val):set_text(control[v].bitstr .. " (" .. control[v].name .. ": " .. control[v].text .. ")")
 	end
 
-	subtree:add(f.unknown2, buf(4, 1))
-
 	local alliance = parser.parseAllianceByte(buf(5, 1))
 	subtree:add(f.alliance_color, alliance.buf, alliance.color)
 	subtree:add(f.alliance_pos, alliance.buf, alliance.pos)
 	info["Alliance"] = alliance.text
 
-	subtree:add(f.unknown2, buf(6, 4))
+	local tLvl = parser.parseTournamentLevelByte(buf(6, 1))
+	subtree:add(f.tournamentLevel, tLvl.buf, tLvl.val):set_text("Tournament Level: " .. tLvl.val .. " (" .. tLvl.str ..")")
+
+	subtree:add(f.matchNum, buf(7, 2))
+	subtree:add(f.playNum, buf(9, 1))
 
 	local date = parser.parseDate(buf(10))
 	local dateTree = subtree:add(f.date, buf(10, 10))

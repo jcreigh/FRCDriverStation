@@ -6,6 +6,16 @@
 
 local parser = {}
 
+function parser.parseTournamentLevelByte(buf)
+	local out = {}
+	out.buf = buf
+	out.val = buf:uint()
+	local levels = {"Match Test", "Practice", "Qualification", "Playoff"}
+	out.str = levels[out.val + 1]
+
+	return out
+end
+
 function parser.parseAllianceByte(buf)
 	local out = {}
 	out.buf = buf

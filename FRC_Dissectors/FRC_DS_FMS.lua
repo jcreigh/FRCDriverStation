@@ -10,7 +10,7 @@ local FRC_DS_FMS = Proto("FRC_DS_FMS", "FRC Driver Station (FMS)")
 
 local f = FRC_DS_FMS.fields
 f.seqNum = ProtoField.uint16("FRC_DS_FMS.seq", "Sequence Number", base.DEC)
-f.unknown1 = ProtoField.uint8("FRC_DS_FMS.unknown1", "Unknown field 1", base.HEX)
+f.commVersion = ProtoField.uint8("FRC_DS.commVersion", "Comm Version")
 
 f.control = ProtoField.uint8("FRC_DS_FMS.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_DS_FMS.control.mode", "Mode")
@@ -29,7 +29,7 @@ function FRC_DS_FMS.dissector(buf, pkt, tree)
 	local info = {}
 
 	subtree:add(f.seqNum, buf(0,2))
-	subtree:add(f.unknown1, buf(2,1))
+	subtree:add(f.commVersion, buf(2,1))
 
 	local control = parser.parseControlBytes(buf(3, 1))
 
@@ -52,7 +52,6 @@ function FRC_DS_FMS.dissector(buf, pkt, tree)
 
 	subtree:add(f.teamNum, buf(4, 2))
 	info["Team"] = buf(4, 2):uint()
-
 
 	local batteryLevel = parser.parseBattery(buf(6, 2))
 	subtree:add(f.battery, batteryLevel.buf, batteryLevel.val)

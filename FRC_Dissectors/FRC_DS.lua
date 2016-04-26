@@ -11,6 +11,8 @@ local FRC_DS = Proto("FRC_DS", "FRC Driver Station")
 local f = FRC_DS.fields
 f.seqNum = ProtoField.uint16("FRC_DS.seq", "Sequence Number", base.DEC)
 
+f.commVersion = ProtoField.uint8("FRC_DS.commVersion", "Comm Version")
+
 f.control = ProtoField.uint8("FRC_DS.control", "Control Byte", base.HEX)
 f.mode = ProtoField.uint8("FRC_DS.control.mode", "Mode")
 f.enabled = ProtoField.bool("FRC_DS.control.enabled", "Enabled")
@@ -62,7 +64,7 @@ function FRC_DS.dissector(buf, pkt, tree)
 	local info = {}
 
 	subtree:add(f.seqNum, buf(0,2))
-	--subtree:add(f.unknown, buf(2,1)) -- Hide, it /always/ seems to be 0x01
+	subtree:add(f.commVersion, buf(2,1))
 
 	local control = parser.parseControlBytes(buf(3, 2))
 
